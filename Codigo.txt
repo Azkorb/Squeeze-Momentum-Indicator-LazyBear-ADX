@@ -1,0 +1,76 @@
+study("Directional Movement Index + ADX + Ploted KEYLEVEL", shorttitle="DMI/ADX/KEYLEVEL")
+
+//
+// @author LazyBear 
+// List of all my indicators: https://www.tradingview.com/v/4IneGo8h/
+//
+// study(shorttitle = "SQZMOM_LB", title="Squeeze Momentum Indicator [LazyBear]", overlay=false)
+
+
+length = input(20, title="BB Length")
+mult = input(2.0,title="BB MultFactor")
+lengthKC=input(20, title="KC Length")
+multKC = input(1.5, title="KC MultFactor")
+multiplier = input(title="Adjustment multiplier", type=integer, minval = 1, maxval = 1000000, defval = 10)
+divider = input(title="Adjustment divider", type=integer, minval = 1, maxval = 1000000, defval = 1)
+useTrueRange = input(true, title="Use TrueRange (KC)", type=bool)
+
+// Calculate BB
+source = close
+basis = sma(source, length)
+dev = multKC * stdev(source, length)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+// Calculate KC
+ma = sma(source, lengthKC)
+range = useTrueRange ? tr : (high - low)
+rangema = sma(range, lengthKC)
+upperKC = ma + rangema * multKC
+lowerKC = ma - rangema * multKC
+
+sqzOn  = (lowerBB > lowerKC) and (upperBB < upperKC)
+sqzOff = (lowerBB < lowerKC) and (upperBB > upperKC)
+noSqz  = (sqzOn == false) and (sqzOff == false)
+
+val = linreg(source  -  avg(avg(highest(high, lengthKC), lowest(low, lengthKC)),sma(close,lengthKC)), 
+            lengthKC,0)
+
+bcolor = iff( val > 0, 
+            iff( val > nz(val[1]), lime, green),
+            iff( val < nz(val[1]), red, maroon))
+scolor = noSqz ? blue : sqzOn ? black : gray 
+plot((val), color=bcolor, style=histogram, linewidth=4)
+plot(0, color=scolor, style=cross, linewidth=2)
+max = highest(val,5000)
+
+
+
+//////////////////////////////////////////////////////
+adxlen = input(14, title="ADX Smoothing")
+dilen = input(14, title="DI Length")
+keyLevel = input(23, title="key level for ADX")
+dirmov(len) =>
+	up = change(high)
+	down = -change(low)
+	truerange = rma(tr, len)
+	plus = fixnan(100 * rma(up > down and up > 0 ? up : 0, len) / truerange)
+	minus = fixnan(100 * rma(down > up and down > 0 ? down : 0, len) / truerange)
+	[plus, minus]
+
+adx(dilen, adxlen) => 
+	[plus, minus] = dirmov(dilen)
+	sum = plus + minus
+	adx = 100 * rma(abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+	[adx, plus, minus]
+
+[sig, up, down] = adx(dilen, adxlen)
+
+
+plot(sig*multiplier/divider, color=red, title="ADX")
+plot(up*multiplier/divider, color=blue, title="+DI")
+plot(down*multiplier/divider, color=gray, title="-DI")
+plot(keyLevel*multiplier/divider, color=white, title="Key Level")
+
+////////////////////////
+
